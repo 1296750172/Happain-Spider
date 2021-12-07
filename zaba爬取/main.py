@@ -126,12 +126,12 @@ def get_text(url):
 
 # 读取配置
 def readConfig():
-    cf = configparser.ConfigParser()
-    cf.read("config.ini",encoding='utf-8')
-    imgpath = cf.items('config')
+    with open('config.txt','r',encoding='utf-8') as f:
+        data = [i.replace("\n",'') for i in f.readlines()]
     data_dict = {}
-    for i in imgpath:
-        data_dict[i[0]] = i[1]
+    for i in data:
+        tem = i.split("=",1)
+        data_dict[tem[0]] = tem[1]
     return data_dict
 
 
@@ -220,6 +220,7 @@ def quchong(data):
 
 
 data_dict = readConfig()
+print(data_dict)
 if __name__ == '__main__':
     num =re.compile('v1=(.*)').findall(data_dict['link'])[0]
     urllist = "https://www.zara.cn/cn/zh/category/{}/products?ajax=true".format(num)
