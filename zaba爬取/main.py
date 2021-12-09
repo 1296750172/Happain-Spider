@@ -126,7 +126,7 @@ def get_text(url):
 
 # 读取配置
 def readConfig():
-    with open('config.txt','r',encoding='utf-8') as f:
+    with open('config.txt','r',encoding='UTF-8-sig') as f:
         data = [i.replace("\n",'') for i in f.readlines()]
     data_dict = {}
     for i in data:

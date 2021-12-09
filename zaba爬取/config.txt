@@ -1,2 +1,2 @@
-imgpath=衣服
-link=https://www.zara.cn/cn/zh/man-bags-l563.html?v1=1886072
+imgpath=帽子
+link=https://www.zara.cn/cn/zh/kids-girl-bags-l346.html?v1=1884930
