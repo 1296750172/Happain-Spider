@@ -2,15 +2,11 @@
 
 
 # 获取延时数据
-import json
 import os
 import random
 import re
 import time
-from collections import OrderedDict
-from urllib3 import encode_multipart_formdata
 from requests_toolbelt.multipart.encoder import MultipartEncoder
-from lxml.html import document_fromstring
 from lxml import etree
 
 
@@ -46,8 +42,11 @@ def getArticle(city):
             text = i[0]
     if not os.path.exists("articles/{}".format(text)):
         print("不存在{}目录".format(text))
-        exit()
+        return None
     article = os.listdir("articles/{}".format(text))
+    if len(article) ==0:
+        print("{}城市目录下没有文件".format(text))
+        return None
     a = random.choice(article)
     return os.path.join("articles/{}".format(text), a)
 
@@ -56,9 +55,7 @@ def getArticle(city):
 # 检测字符串是否合格
 def checkContent(content):
     headers= {'host':'www.yebzj.com','content-type':'application/x-www-form-urlencoded','x-requested-with':'XMLHttpRequest',
-              'cookie':'Hm_lvt_d833e5f0f433fad0050dea72cfe1a068=1639163453; lqzp__s_uid=13177853190; '
-                       'lqzp__s_pwd=AFUDVgUJBgVWBAcBUwZXAwIMBlUAVQJTAAoCUwIPDwA%3D725ffbbe6b; lqzp__fcityid=1; '
-                       'Hm_lpvt_d833e5f0f433fad0050dea72cfe1a068=1639328524','user-agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.93 Safari/537.36'}
+              'cookie':cookies,'user-agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.93 Safari/537.36'}
     data ={'value':content}
     res =  requests.post(url="https://www.yebzj.com/javascript.php?part=chk_badwords&catid=1554",headers=headers,data=data,verify=False)
     weijin = re.compile('<b>(.*?)</b>').findall(res.text)
@@ -70,14 +67,17 @@ def checkContent(content):
 # 随机选择一个文件 返回正确文本
 def getArticleRight(city):
     path = getArticle(city)
+    if path is None:
+        return None,None
     with open(path,'r') as f:
         content = f.read()
     a = etree.HTML(content).xpath("//div")[0].xpath("string(.)")
     h3 = etree.HTML(content).xpath("//div/h3/text()")[0]
     value = checkContent(a)
-    for i in value:
-        content = content.replace(i,'')
-    content = etree.HTML(content).xpath("//div")[0].xpath("string(.)")
+    if value is not None:
+        for i in value:
+            content = content.replace(i,'')
+        content = etree.HTML(content).xpath("//div")[0].xpath("string(.)")
     os.remove(path)
     return h3,content
 
@@ -123,9 +123,7 @@ def send(title,content,imagepath,city,area):
         }
 
     )
-    headers = {'Host': 'www.yebzj.com', 'Cookie': 'Hm_lvt_d833e5f0f433fad0050dea72cfe1a068=1639163453; lqzp__s_uid=13177853190; '
-                                                  'lqzp__s_pwd=AFUDVgUJBgVWBAcBUwZXAwIMBlUAVQJTAAoCUwIPDwA%3D725ffbbe6b; lqzp__fcityid=1; '
-                                                  'Hm_lpvt_d833e5f0f433fad0050dea72cfe1a068=1639284642',
+    headers = {'Host': 'www.yebzj.com', 'Cookie': cookies,
                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.93 Safari/537.36'}
     headers['Content-Type'] = m.content_type
     res = requests.post(url="https://www.yebzj.com/ph.php?action=input",data=m,headers=headers,verify=False)
@@ -138,31 +136,94 @@ def send(title,content,imagepath,city,area):
 
 def getCityArea(city):
     res = requests.post(url="https://www.yebzj.com/include/selectwhere.php?action=getarea&parentid={}".format(city),verify=False,
-                  headers={'cookie':'lqzp__s_uid=13177853190; lqzp__s_pwd=AFUDVgUJBgVWBAcBUwZXAwIMBlUAVQJTAAoCUwIPDwA%3D725ffbbe6b; lqzp__fcityid=1; '
-                                    'Hm_lvt_d833e5f0f433fad0050dea72cfe1a068=1639163453,1639396845; Hm_lpvt_d833e5f0f433fad0050dea72cfe1a068=1639403695'},
+                  headers={'cookie':cookies},
                   )
     city = re.compile(r"value=\\'(.*?)\\'").findall(res.text)[-1]
     return city
 
 
+# 登陆
+def login(username,password) :
+    m = MultipartEncoder(
+        fields={
+            'mod':'login',
+            'action':'dopost',
+            'url':'https://www.yebzj.com/ph.php?action=post&amp;catid=1554&amp;cityid=0',
+            'userid':username,
+            'userpwd':password,
+            'memory':'on',
+            'log_submit':'立即登录'
+        }
+
+    )
+    headers = {'Host': 'www.yebzj.com',
+               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.93 Safari/537.36'}
+    headers['Content-Type'] = m.content_type
+    res = requests.post(url="https://www.yebzj.com/mr.php",data=m,headers=headers,verify=False)
+    d = "{}={};"
+    tem = ''
+    for i in res.cookies:
+        tem +=d.format(i.name,i.value)
+    return tem
+# 从文件获取账号密码
+def getUser():
+    with open('user.txt','r') as f:
+        data = [i.replace('\n','').split("-----") for i in  f.readlines()]
+    return data
+
+# 得到cookies
+def getCookies():
+    for i in userlist:
+        cookies = login(i[0], i[1])
+        yield cookies
+
+global cookies
+userlist = getUser()
+
 if __name__ == '__main__':
-    if int(time.time()) >1639738090:
-        exit()
+
+
     timenum = getTime()
     delay = int(getDelay())
     print("延时{}秒后启动".format(timenum))
     time.sleep(int(timenum))
     print("开始启动")
+
+
     citylist = {'北京': '1', '上海': '2', '深圳': '6', '广州': '5', '杭州': '26', '长沙': '158', '成都': '281', '重庆': '4', '南昌': '194', '西安': '271', '厦门': '56', '福州': '55',
                 '天津': '3', '沈阳': '205', '南京': '181', '武汉': '145', '郑州': '115', '合肥': '38', '宁波': '28', '苏州': '190', '昆明': '323'}
-    for i in citylist.items():
-        print("当前发布{}城市".format(i[0]))
-        area = getCityArea(i[1])
-        # 获取正确的文章内容和标题
-        h3,content = getArticleRight(i[1])
-        # 随机选择图片
-        img = getImages()
-        # 发布
-        send(h3,content,img,i[1],area)
-        time.sleep(delay)
 
+
+
+    # 30个
+    num = 0
+    cc = getCookies()
+    cookies = next(cc)
+    flag = True
+    while True:
+        for i in citylist.items():
+            print("当前发布{}城市".format(i[0]))
+            area = getCityArea(i[1])
+            # 获取正确的文章内容和标题
+            h3,content = getArticleRight(i[1])
+            if h3 is None:
+                time.sleep(0.5)
+                continue
+            # 随机选择图片
+
+        
+            img = getImages()
+            # 发布
+            send(h3,content,img,i[1],area)
+            num+=1
+            if num>=30:
+                try:
+                    cookies = next(cc)
+                except:
+                    flag = False
+                    break
+                num=0
+            time.sleep(delay)
+        if flag == False:
+            break
+    input()
